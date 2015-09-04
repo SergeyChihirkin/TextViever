@@ -139,6 +139,10 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
             @Override
             public void run() {
                 textPane.setText("");
+
+                if (textOnScreen.getStrings().size() == 0)
+                    return;
+
                 textPane.setEditorKit(new TabSizeEditorKit(TAB_WIDTH));
                 StyledDocument doc = textPane.getStyledDocument();
                 ((DefaultCaret)textPane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
