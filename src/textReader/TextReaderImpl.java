@@ -72,7 +72,7 @@ public class TextReaderImpl implements TextReader {
     }
 
     private void prepareChunk() {
-        bufferSize = Math.min(BUFFER_SIZE, fileLength - 1);
+        bufferSize = Math.min(BUFFER_SIZE, fileLength);
 
         try {
             final ByteBuffer byteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, bufferSize);
