@@ -91,6 +91,13 @@ public class TextOnScreenManager {
                 stringsOnScreen.add(createStringOnScreenAndResetFields());
         }
 
+        if (state == State.LINE_PREFIX && stringsOnScreen.size() == 0) {
+            strFrstWordFntMetricsInf = curWordFntMetricsInf;
+            stringsOnScreen.add(createStringOnScreenAndResetFields());
+            state = State.BEGIN;
+            return stringsOnScreen;
+        }
+
         if (baos.size() != 0) {
             String wordFromBaos = getWordFromBaos();
             strElements.add(wordFromBaos);
