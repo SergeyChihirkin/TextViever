@@ -144,15 +144,15 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
                 ((DefaultCaret)textPane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
 
                 try {
-
-                    for (StringOnScreen stringOnScreen : textOnScreen.getStrings()) {
+                    for (int i = textOnScreen.getFrstStrNumber(); i <= textOnScreen.getLastStrNumber(); i++) {
+                        StringOnScreen stringOnScreen = textOnScreen.getStrings().get(i);
                         curWordFntMetricsInf = stringOnScreen.getStrFrstWordFntMetricsInf();
                         LinkedList<String> elements = stringOnScreen.getElements();
-                        for (int i = 0; i < elements.size(); i += 2) {
-                            doc.insertString(doc.getLength(), elements.get(i), getStyle());
+                        for (int j = 0; j < elements.size(); j += 2) {
+                            doc.insertString(doc.getLength(), elements.get(j), getStyle());
                             curWordFntMetricsInf = (curWordFntMetricsInf + 1) % MAX_FNT_MTRCS_INF;
-                            if (i + 1 < elements.size())
-                                doc.insertString(doc.getLength(), elements.get(i + 1), getStyle());
+                            if (j + 1 < elements.size())
+                                doc.insertString(doc.getLength(), elements.get(j + 1), getStyle());
                         }
                         doc.insertString(doc.getLength(), "\n", getStyle());
                     }
@@ -232,12 +232,16 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
             return;
 
         if (e.getKeyCode() == KeyEvent.VK_DOWN) {
+            textOnScreenManager.nextString(textOnScreen);
             printText();
         } else if (e.getKeyCode() == KeyEvent.VK_UP) {
+            textOnScreenManager.previousString(textOnScreen);
             printText();
         } else if (e.getKeyCode() == KeyEvent.VK_PAGE_DOWN) {
+            textOnScreenManager.nextPage(textOnScreen);
             printText();
         } else if (e.getKeyCode() == KeyEvent.VK_PAGE_UP) {
+            textOnScreenManager.previousPage(textOnScreen);
             printText();
         }
     }

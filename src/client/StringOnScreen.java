@@ -20,4 +20,8 @@ public class StringOnScreen {
     public int getStrFrstWordFntMetricsInf() {
         return strFrstWordFntMetricsInf;
     }
+
+    public int getHeightOfStr() {
+        return heightOfStr;
+    }
 }

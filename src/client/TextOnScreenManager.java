@@ -17,6 +17,7 @@ public class TextOnScreenManager {
     private int curStrWdth;
     private LinkedList<String> strElements;
     private int strFrstWordFntMetricsInf;
+    private int curStrHght;
 
     private State state;
     private int curWordFntMetricsInf;
@@ -43,13 +44,29 @@ public class TextOnScreenManager {
             textOnScreen.getStrings().addAll(stringsOnScreen);
         }
 
+        addFrstAndLastStrNumbrs(0, textOnScreen);
+
         return textOnScreen;
+    }
+
+    private void addFrstAndLastStrNumbrs(int frstStrNum, TextOnScreen textOnScreen) {
+        textOnScreen.setFrstStrNumber(frstStrNum);
+        int height = 0;
+        int i = frstStrNum;
+        while (height < windowHeight && i < textOnScreen.getStrings().size()) {
+            height += textOnScreen.getStrings().get(i).getHeightOfStr();
+            i++;
+        }
+
+        final int lastStrNumber = i == frstStrNum ? i : i - 1;
+        textOnScreen.setLastStrNumber(lastStrNumber);
     }
 
     private void init() {
         curWordFntMetricsInf = 0;
         strFrstWordFntMetricsInf = 0;
         curWordFntMetrics = frstFntMetrics;
+        curStrHght = curWordFntMetrics.getHeight();
         curWrdWdth = 0;
         wrdHght = 0;
         state = State.BEGIN;
@@ -89,7 +106,7 @@ public class TextOnScreenManager {
     }
 
     private StringOnScreen createStringOnScreenAndResetFields() {
-        final StringOnScreen stringOnScreen = new StringOnScreen(strElements, 0, strFrstWordFntMetricsInf);
+        final StringOnScreen stringOnScreen = new StringOnScreen(strElements, curStrHght, strFrstWordFntMetricsInf);
         resetFields();
         return stringOnScreen;
     }
@@ -97,6 +114,7 @@ public class TextOnScreenManager {
     private void resetFields() {
         strElements = new LinkedList<>();
         curStrWdth = 0;
+        curStrHght = curWordFntMetrics.getHeight();
     }
 
     private boolean putChar(char c) {
@@ -230,6 +248,7 @@ public class TextOnScreenManager {
         baos.reset();
         curStrWdth += curWrdWdth;
         curWrdWdth = 0;
+        curStrHght = Math.max(curStrHght, wrdHght);
 
         return word;
     }
@@ -249,6 +268,38 @@ public class TextOnScreenManager {
 
     private boolean isNotFitWindow(int charWidth) {
         return windowWidth <= curStrWdth + curWrdWdth + charWidth;
+    }
+
+    public void nextString(TextOnScreen textOnScreen) {
+        int frstStrNumber = textOnScreen.getFrstStrNumber();
+        if (frstStrNumber != textOnScreen.getLastStrNumber()) {
+            frstStrNumber++;
+            addFrstAndLastStrNumbrs(frstStrNumber, textOnScreen);
+        }
+    }
+
+    public void previousString(TextOnScreen textOnScreen) {
+        int frstStrNumber = textOnScreen.getFrstStrNumber();
+        if (frstStrNumber != 0) {
+            frstStrNumber--;
+            addFrstAndLastStrNumbrs(frstStrNumber, textOnScreen);
+        }
+    }
+
+    public void nextPage(TextOnScreen textOnScreen) {
+        addFrstAndLastStrNumbrs(textOnScreen.getLastStrNumber(), textOnScreen);
+    }
+
+    public void previousPage(TextOnScreen textOnScreen) {
+        int oldFrstStrNum = textOnScreen.getFrstStrNumber();
+
+        if (oldFrstStrNum == textOnScreen.getLastStrNumber()) {
+            previousString(textOnScreen);
+            oldFrstStrNum = textOnScreen.getFrstStrNumber();
+        }
+
+        while (oldFrstStrNum < textOnScreen.getLastStrNumber() && textOnScreen.getFrstStrNumber() != 0)
+            previousString(textOnScreen);
     }
 
     static enum State {
