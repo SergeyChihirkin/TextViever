@@ -96,9 +96,10 @@ public class FontChooser extends JDialog implements ActionListener {
         if (nameCmbBox == e.getSource() || boldChckBx == e.getSource() || italicChckBx == e.getSource()
                 || textField == e.getSource())
             changeLocalFont();
-        else if (okBtn == e.getSource())
+        else if (okBtn == e.getSource()) {
+            changeLocalFont();
             onOkBtn();
-        else if (cnclBtn == e.getSource())
+        } else if (cnclBtn == e.getSource())
             onCnclBtn();
     }
 
