@@ -15,8 +15,8 @@ import java.util.LinkedList;
 
 public class MainPanel extends ComponentAdapter implements ActionListener, KeyListener {
     private final int MAX_FNT_MTRCS_INF = 4;
-    public static final int NUM_OF_STYLES = 2;
-    public static final int TAB_WIDTH = 72;
+    private final int NUM_OF_STYLES = 2;
+    private final int TAB_WIDTH = 72;
 
     private JFrame frame;
     private JPanel mainPanel;
@@ -57,7 +57,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     }
 
     private void addFileFilter() {
-        FileNameExtensionFilter filter = new FileNameExtensionFilter("TEXT FILES", "txt", "text");
+        final FileNameExtensionFilter filter = new FileNameExtensionFilter("TEXT FILES", "txt", "text");
         fc.setFileFilter(filter);
     }
 
@@ -71,7 +71,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
         }
 
         try {
-            String s = Files.probeContentType(f.toPath());
+            final String s = Files.probeContentType(f.toPath());
             if (s == null || !s.equals("text/plain")) {
                 JOptionPane.showMessageDialog(frame, "Wrong file format.", "Error", JOptionPane.ERROR_MESSAGE);
                 return;
@@ -95,7 +95,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     }
 
     private FontMetrics getFntMetrics(SimpleAttributeSet attr) {
-        Font fnt = FontsWindow.makeFont(attr);
+        final Font fnt = FontsWindow.makeFont(attr);
 
         return textPane.getFontMetrics(fnt);
     }
@@ -116,7 +116,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     }
 
     private void onOpnBtn() {
-        int returnVal = fc.showOpenDialog(mainPanel);
+        final int returnVal = fc.showOpenDialog(mainPanel);
 
         if (returnVal == JFileChooser.APPROVE_OPTION)
             getTextByFile(fc.getSelectedFile());
@@ -143,14 +143,14 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
                 if (textOnScreen.getStrings().size() == 0)
                     return;
 
-                StyledDocument doc = textPane.getStyledDocument();
+                final StyledDocument doc = textPane.getStyledDocument();
                 ((DefaultCaret)textPane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
 
                 try {
                     for (int i = textOnScreen.getFrstStrNumber(); i <= textOnScreen.getLastStrNumber(); i++) {
-                        StringOnScreen stringOnScreen = textOnScreen.getStrings().get(i);
+                        final StringOnScreen stringOnScreen = textOnScreen.getStrings().get(i);
                         curWordFntMetricsInf = stringOnScreen.getStrFrstWordFntMetricsInf();
-                        LinkedList<String> elements = stringOnScreen.getElements();
+                        final LinkedList<String> elements = stringOnScreen.getElements();
                         for (int j = 0; j < elements.size(); j += 2) {
                             doc.insertString(doc.getLength(), elements.get(j), getStyle());
                             curWordFntMetricsInf = (curWordFntMetricsInf + 1) % MAX_FNT_MTRCS_INF;
@@ -169,15 +169,15 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     }
 
     private Style getStyle() {
-        int numOfStyle = curWordFntMetricsInf < 2 ? 0 : 1;
+        final int numOfStyle = curWordFntMetricsInf < 2 ? 0 : 1;
         return styles[numOfStyle];
     }
 
     private void addStylesToDocument() {
-        StyledDocument doc = textPane.getStyledDocument();
+        final StyledDocument doc = textPane.getStyledDocument();
         doc.putProperty(PlainDocument.tabSizeAttribute, TAB_WIDTH);
 
-        Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
+        final Style def = StyleContext.getDefaultStyleContext().getStyle(StyleContext.DEFAULT_STYLE);
 
         first = doc.addStyle("first", def);
         setFontAttrs(first, frstAttr);

@@ -37,7 +37,7 @@ public class TextOnScreenManager {
     TextOnScreen createTextOnScreen(TextStorage textStorage) {
         init();
 
-        TextOnScreen textOnScreen = new TextOnScreen();
+        final TextOnScreen textOnScreen = new TextOnScreen();
 
         for (String stringOfText : textStorage.getStrings()) {
             LinkedList<StringOnScreen> stringsOnScreen = getStringsOnScreen(stringOfText);
@@ -74,7 +74,7 @@ public class TextOnScreenManager {
     }
 
     private LinkedList<StringOnScreen> getStringsOnScreen(String stringOfText) {
-        LinkedList<StringOnScreen> stringsOnScreen = new LinkedList<>();
+        final LinkedList<StringOnScreen> stringsOnScreen = new LinkedList<>();
 
         if (stringOfText.length() == 0) {
             strFrstWordFntMetricsInf = curWordFntMetricsInf;
@@ -85,8 +85,8 @@ public class TextOnScreenManager {
         resetFields();
 
         for (int i = 0; i < stringOfText.length(); i++) {
-            char c = stringOfText.charAt(i);
-            boolean isStringEnded = putChar(c);
+            final char c = stringOfText.charAt(i);
+            final boolean isStringEnded = putChar(c);
             if (isStringEnded)
                 stringsOnScreen.add(createStringOnScreenAndResetFields());
         }
@@ -99,7 +99,7 @@ public class TextOnScreenManager {
         }
 
         if (baos.size() != 0) {
-            String wordFromBaos = getWordFromBaos();
+            final String wordFromBaos = getWordFromBaos();
             strElements.add(wordFromBaos);
             if (state == State.GET_FIRST_WORD)
                 strFrstWordFntMetricsInf = curWordFntMetricsInf;
@@ -188,7 +188,7 @@ public class TextOnScreenManager {
     }
 
     private boolean waitForNextWord(char c) {
-        int charWidth = findCharWidth(c);
+        final int charWidth = findCharWidth(c);
         if (isNotFitWindow(charWidth)) {
             strElements.add(getWordFromBaos());
             if (!isBlankSymbol(c)) {
@@ -212,7 +212,7 @@ public class TextOnScreenManager {
     }
 
     private boolean getWord(char c) {
-        int charWidth = findCharWidth(c);
+        final int charWidth = findCharWidth(c);
         if (isNotFitWindow(charWidth)) {
             if (isBlankSymbol(c)) {
                 strElements.add(getWordFromBaos());
@@ -251,7 +251,7 @@ public class TextOnScreenManager {
     }
 
     private String getWordFromBaos() {
-        String word = new String(baos.toByteArray(), CHARSET);
+        final String word = new String(baos.toByteArray(), CHARSET);
         baos.reset();
         curStrWdth += curWrdWdth;
         curWrdWdth = 0;

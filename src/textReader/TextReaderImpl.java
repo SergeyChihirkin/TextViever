@@ -19,17 +19,14 @@ public class TextReaderImpl implements TextReader {
     private FileChannel channel;
 
     private CharBuffer chunkChrBuf;
-    private long bufferSize;
     private long fileLength;
-
-    private ByteArrayOutputStream baos;
 
 
     @Override
     public TextStorage getText(File file) throws IOException {
-        baos = new ByteArrayOutputStream();
+        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         setFile(file);
-        TextStorage textStorage = new TextStorage();
+        final TextStorage textStorage = new TextStorage();
         try {
             if (fileLength == 0)
                 return textStorage;
@@ -40,13 +37,13 @@ public class TextReaderImpl implements TextReader {
             char lastSeparator = '\0';
             boolean isWaitingForSepSymb = false;
             while (bufPos < chunkChrBuf.length()) {
-                char c = chunkChrBuf.get(bufPos);
+                final char c = chunkChrBuf.get(bufPos);
 
                 if (isSepSymbol(c)) {
                     if (isWaitingForSepSymb && c!= lastSeparator) {
                         isWaitingForSepSymb = false;
                     } else {
-                        String str = new String(baos.toByteArray(), CHARSET);
+                        final String str = new String(baos.toByteArray(), CHARSET);
                         textStorage.addString(str);
                         baos.reset();
                         isWaitingForSepSymb = true;
@@ -58,7 +55,7 @@ public class TextReaderImpl implements TextReader {
                 bufPos++;
             }
 
-            String str = new String(baos.toByteArray(), CHARSET);
+            final String str = new String(baos.toByteArray(), CHARSET);
             textStorage.addString(str);
         } finally {
             close();
@@ -72,7 +69,7 @@ public class TextReaderImpl implements TextReader {
     }
 
     private void prepareChunk() {
-        bufferSize = Math.min(BUFFER_SIZE, fileLength);
+        final long bufferSize = Math.min(BUFFER_SIZE, fileLength);
 
         try {
             final ByteBuffer byteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, bufferSize);

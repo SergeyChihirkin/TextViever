@@ -6,11 +6,11 @@ import java.awt.*;
 
 public class Main {
     public static void main(String[] args) {
-        JFrame frame = new JFrame("TextViewer");
+        final JFrame frame = new JFrame("TextViewer");
         frame.setLayout(new BorderLayout());
         frame.setMinimumSize(new Dimension(70, 210));
 
-        MainPanel mainPanel;
+        final MainPanel mainPanel;
         String fileName;
         if (args.length != 0) {
             fileName = args[0];
