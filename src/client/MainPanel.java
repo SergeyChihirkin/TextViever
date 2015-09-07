@@ -16,7 +16,7 @@ import java.util.LinkedList;
 public class MainPanel extends ComponentAdapter implements ActionListener, KeyListener {
     private final int MAX_FNT_MTRCS_INF = 4;
     public static final int NUM_OF_STYLES = 2;
-    public static final int TAB_WIDTH = 70;
+    public static final int TAB_WIDTH = 72;
 
     private JFrame frame;
     private JPanel mainPanel;
@@ -143,7 +143,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
                 if (textOnScreen.getStrings().size() == 0)
                     return;
 
-                textPane.setEditorKit(new TabSizeEditorKit(TAB_WIDTH));
+//                textPane.setEditorKit(new TabSizeEditorKit(TAB_WIDTH));
                 StyledDocument doc = textPane.getStyledDocument();
                 ((DefaultCaret)textPane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
 
@@ -161,8 +161,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
                         doc.insertString(doc.getLength(), "\n", getStyle());
                     }
                 } catch (BadLocationException e) {
-                    JOptionPane.showMessageDialog(frame, "Can't print text", "Error",
-                            JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(frame, "Can't print text", "Error", JOptionPane.ERROR_MESSAGE);
                     e.printStackTrace();
                 }
 
