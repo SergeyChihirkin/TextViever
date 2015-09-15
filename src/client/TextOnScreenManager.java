@@ -4,26 +4,30 @@ import data.TextStorage;
 
 import java.awt.*;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.LinkedList;
 
 public class TextOnScreenManager {
     private final Charset CHARSET = Charset.forName("UTF-8");
-    private final int MAX_FNT_MTRCS_INF = 4;
+    private final int MAX_WORD_IN_GROUP_NUM = 2;
+    private final int MAX_FNT_METRICS_NUM = 2;
 
     private int windowHeight, windowWidth, tabWidth;
     private FontMetrics frstFntMetrics, scndFntMetrics;
 
     private int curStrWdth;
-    private LinkedList<String> strElements;
-    private int strFrstWordFntMetricsInf;
+    private LinkedList<StrElement> strElements;
     private int curStrHght;
 
     private State state;
-    private int curWordFntMetricsInf;
+    private int curWordInGroupNum = 0;
     private FontMetrics curWordFntMetrics;
-    private int wrdHght, curWrdWdth;
-    private ByteArrayOutputStream baos;
+    private int curWordFntMetricsNum = 0;
+    private int elHght, elWdth;
+    private int wordHght, wordWdth;
+    private ByteArrayOutputStream elBaos;
+    private ByteArrayOutputStream wordBaos;
 
 
     public TextOnScreenManager(WindowInformation windowInformation) {
@@ -63,21 +67,19 @@ public class TextOnScreenManager {
     }
 
     private void init() {
-        curWordFntMetricsInf = 0;
-        strFrstWordFntMetricsInf = 0;
         curWordFntMetrics = frstFntMetrics;
         curStrHght = curWordFntMetrics.getHeight();
-        curWrdWdth = 0;
-        wrdHght = 0;
+        elWdth = 0;
+        elHght = 0;
         state = State.BEGIN;
-        baos = new ByteArrayOutputStream();
+        elBaos = new ByteArrayOutputStream();
+        wordBaos = new ByteArrayOutputStream();
     }
 
     private LinkedList<StringOnScreen> getStringsOnScreen(String stringOfText) {
         final LinkedList<StringOnScreen> stringsOnScreen = new LinkedList<>();
 
         if (stringOfText.length() == 0) {
-            strFrstWordFntMetricsInf = curWordFntMetricsInf;
             stringsOnScreen.add(createStringOnScreenAndResetFields());
             return stringsOnScreen;
         }
@@ -92,20 +94,21 @@ public class TextOnScreenManager {
         }
 
         if (state == State.LINE_PREFIX && stringsOnScreen.size() == 0) {
-            strFrstWordFntMetricsInf = curWordFntMetricsInf;
             stringsOnScreen.add(createStringOnScreenAndResetFields());
             state = State.BEGIN;
             return stringsOnScreen;
         }
 
-        if (baos.size() != 0) {
-            final String wordFromBaos = getWordFromBaos();
-            strElements.add(wordFromBaos);
-            if (state == State.GET_FIRST_WORD)
-                strFrstWordFntMetricsInf = curWordFntMetricsInf;
+        if (elBaos.size() != 0 || wordBaos.size() != 0) {
+            if (wordBaos.size() != 0) {
+                addWordToElBaos();
+                strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
+                nextWordNum();
+            } else
+                strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
             stringsOnScreen.add(createStringOnScreenAndResetFields());
-            if (!wordFromBaos.contains(" ") && !wordFromBaos.contains("\t"))
-                nextFntMetrics();
+//            if (!elementFromBaos.startsWith(" ") && !elementFromBaos.startsWith("\t"))
+//                nextWordNum();
             state = State.BEGIN;
         }
 
@@ -113,7 +116,7 @@ public class TextOnScreenManager {
     }
 
     private StringOnScreen createStringOnScreenAndResetFields() {
-        final StringOnScreen stringOnScreen = new StringOnScreen(strElements, curStrHght, strFrstWordFntMetricsInf);
+        final StringOnScreen stringOnScreen = new StringOnScreen(strElements, curStrHght);
         resetFields();
         return stringOnScreen;
     }
@@ -167,18 +170,19 @@ public class TextOnScreenManager {
     private boolean getFirstWord(char c) {
         if (isBlankSymbol(c)) {
             state = State.WAIT_FOR_NEXT_WORD;
-            strElements.add(getWordFromBaos());
-            strFrstWordFntMetricsInf = curWordFntMetricsInf;
-            nextFntMetrics();
+            addWordToElBaos();
+            if (curWordInGroupNum == MAX_WORD_IN_GROUP_NUM - 1)
+                strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
+            nextWordNum();
             return waitForNextWord(c);
         }
 
         int charWidth = findCharWidth(c);
         if (isNotFitWindow(charWidth)) {
-            strElements.add(getWordFromBaos());
+            addWordToElBaos();
+            strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
             addCharToWord(c, charWidth);
             state = State.GET_FIRST_WORD;
-            strFrstWordFntMetricsInf = curWordFntMetricsInf;
             return true;
         }
 
@@ -190,9 +194,10 @@ public class TextOnScreenManager {
     private boolean waitForNextWord(char c) {
         final int charWidth = findCharWidth(c);
         if (isNotFitWindow(charWidth)) {
-            strElements.add(getWordFromBaos());
+            final ElementType elementType = curWordInGroupNum == 0 ? ElementType.SPACE : ElementType.GROUP;
+            strElements.add(new StrElement(elementType, getElementFromBaos(), curWordFntMetricsNum));
             if (!isBlankSymbol(c)) {
-                addCharToWord(c, charWidth);
+                addCharToElement(c, charWidth);
                 state = State.GET_FIRST_WORD;
             } else
                 state = State.BEGIN;
@@ -201,12 +206,13 @@ public class TextOnScreenManager {
         }
 
         if (!isBlankSymbol(c)) {
-            strElements.add(getWordFromBaos());
+            if (curWordInGroupNum == 0)
+                strElements.add(new StrElement(ElementType.SPACE, getElementFromBaos(), curWordFntMetricsNum));
             state = State.GET_WORD;
             return getWord(c);
         }
 
-        addCharToWord(c, charWidth);
+        addCharToElement(c, charWidth);
 
         return false;
     }
@@ -215,10 +221,14 @@ public class TextOnScreenManager {
         final int charWidth = findCharWidth(c);
         if (isNotFitWindow(charWidth)) {
             if (isBlankSymbol(c)) {
-                strElements.add(getWordFromBaos());
-                nextFntMetrics();
+                addWordToElBaos();
+                strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
+                nextWordNum();
                 state = State.BEGIN;
             } else {
+                if (curWordInGroupNum != 0)
+                    strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
+
                 addCharToWord(c, charWidth);
                 state = State.GET_FIRST_WORD;
             }
@@ -227,9 +237,11 @@ public class TextOnScreenManager {
         }
 
         if (isBlankSymbol(c)) {
-            strElements.add(getWordFromBaos());
+            addWordToElBaos();
+            if (curWordInGroupNum == MAX_WORD_IN_GROUP_NUM - 1)
+                strElements.add(new StrElement(ElementType.GROUP, getElementFromBaos(), curWordFntMetricsNum));
+            nextWordNum();
             state = State.WAIT_FOR_NEXT_WORD;
-            nextFntMetrics();
             return waitForNextWord(c);
         }
 
@@ -238,31 +250,53 @@ public class TextOnScreenManager {
         return false;
     }
 
-    private void nextFntMetrics() {
-        curWordFntMetricsInf = (curWordFntMetricsInf + 1) % MAX_FNT_MTRCS_INF;
+    private void nextWordNum() {
+        curWordInGroupNum = (curWordInGroupNum + 1) % MAX_WORD_IN_GROUP_NUM;
 
-        curWordFntMetrics = curWordFntMetricsInf < 2 ? frstFntMetrics : scndFntMetrics;
+        if (curWordInGroupNum == 0) {
+            curWordFntMetricsNum = (curWordFntMetricsNum + 1) % MAX_FNT_METRICS_NUM;
+            curWordFntMetrics = curWordFntMetricsNum == 0 ? frstFntMetrics : scndFntMetrics;
+        }
+    }
+
+    private void addCharToElement(char c, int charWidth) {
+        elHght = Math.max(elHght, curWordFntMetrics.getHeight()) ;
+        elWdth += charWidth;
+        elBaos.write(c);
     }
 
     private void addCharToWord(char c, int charWidth) {
-        wrdHght = curWordFntMetrics.getHeight();
-        curWrdWdth += charWidth;
-        baos.write(c);
+        wordHght = curWordFntMetrics.getHeight();
+        wordWdth += charWidth;
+        wordBaos.write(c);
     }
 
-    private String getWordFromBaos() {
-        final String word = new String(baos.toByteArray(), CHARSET);
-        baos.reset();
-        curStrWdth += curWrdWdth;
-        curWrdWdth = 0;
-        curStrHght = Math.max(curStrHght, wrdHght);
+    private void addWordToElBaos() {
+        try {
+            elBaos.write(wordBaos.toByteArray());
+            wordBaos.reset();
+            elHght = Math.max(elHght, wordHght);
+            wordHght = 0;
+            elWdth += wordWdth;
+            wordWdth = 0;
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String getElementFromBaos() {
+        final String word = new String(elBaos.toByteArray(), CHARSET);
+        elBaos.reset();
+        curStrWdth += elWdth;
+        elWdth = 0;
+        curStrHght = Math.max(curStrHght, elHght);
 
         return word;
     }
 
     private int findCharWidth(char c) {
         if (c == '\t') {
-            final int offset = curStrWdth + curWrdWdth;
+            final int offset = curStrWdth + elWdth;
             return (offset / tabWidth + 1) * tabWidth - offset;
         }
 
@@ -274,7 +308,7 @@ public class TextOnScreenManager {
     }
 
     private boolean isNotFitWindow(int charWidth) {
-        return windowWidth <= curStrWdth + curWrdWdth + charWidth;
+        return windowWidth <= curStrWdth + elWdth + wordWdth + charWidth;
     }
 
     public void nextString(TextOnScreen textOnScreen) {

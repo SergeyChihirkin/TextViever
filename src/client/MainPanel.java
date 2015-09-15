@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.util.LinkedList;
 
 public class MainPanel extends ComponentAdapter implements ActionListener, KeyListener {
-    private final int MAX_FNT_MTRCS_INF = 4;
     private final int NUM_OF_STYLES = 2;
     private final int TAB_WIDTH = 72;
 
@@ -39,8 +38,6 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     private TextOnScreen textOnScreen;
     private TextStorage textStorage;
     private TextOnScreenManager textOnScreenManager;
-
-    private int curWordFntMetricsInf;
 
 
     public MainPanel(JFrame frame, TextReader reader) {
@@ -118,8 +115,10 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     private void onOpnBtn() {
         final int returnVal = fc.showOpenDialog(mainPanel);
 
-        if (returnVal == JFileChooser.APPROVE_OPTION)
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
             getTextByFile(fc.getSelectedFile());
+            redraw();
+        }
     }
 
     private void getTextByFile(File selectedFile) {
@@ -127,7 +126,6 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
 
         try {
             textStorage = reader.getText(file);
-            redraw();
         } catch (IOException e) {
             JOptionPane.showMessageDialog(frame, "Can't read from that file", "Error", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
@@ -149,15 +147,11 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
                 try {
                     for (int i = textOnScreen.getFrstStrNumber(); i <= textOnScreen.getLastStrNumber(); i++) {
                         final StringOnScreen stringOnScreen = textOnScreen.getStrings().get(i);
-                        curWordFntMetricsInf = stringOnScreen.getStrFrstWordFntMetricsInf();
-                        final LinkedList<String> elements = stringOnScreen.getElements();
-                        for (int j = 0; j < elements.size(); j += 2) {
-                            doc.insertString(doc.getLength(), elements.get(j), getStyle());
-                            curWordFntMetricsInf = (curWordFntMetricsInf + 1) % MAX_FNT_MTRCS_INF;
-                            if (j + 1 < elements.size())
-                                doc.insertString(doc.getLength(), elements.get(j + 1), getStyle());
+                        final LinkedList<StrElement> strElements = stringOnScreen.getStrElements();
+                        for (StrElement strElement : strElements) {
+                            doc.insertString(doc.getLength(), strElement.getStr(), getStyle(strElement.getNumOfFnt()));
                         }
-                        doc.insertString(doc.getLength(), "\n", getStyle());
+                        doc.insertString(doc.getLength(), "\n", findStyle(stringOnScreen.getHeightOfStr()));
                     }
                 } catch (BadLocationException e) {
                     JOptionPane.showMessageDialog(frame, "Can't print text", "Error", JOptionPane.ERROR_MESSAGE);
@@ -168,9 +162,15 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
         });
     }
 
-    private Style getStyle() {
-        final int numOfStyle = curWordFntMetricsInf < 2 ? 0 : 1;
-        return styles[numOfStyle];
+    private AttributeSet findStyle(int heightOfStr) {
+        if (getFntMetrics(frstAttr).getHeight() == heightOfStr)
+            return getStyle(0);
+
+        return getStyle(1);
+    }
+
+    private Style getStyle(int numOfFnt) {
+        return styles[numOfFnt];
     }
 
     private void addStylesToDocument() {

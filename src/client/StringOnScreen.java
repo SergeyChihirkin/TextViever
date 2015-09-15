@@ -3,22 +3,16 @@ package client;
 import java.util.LinkedList;
 
 public class StringOnScreen {
-    private LinkedList<String> elements;
+    private LinkedList<StrElement> strElements;
     private int heightOfStr;
-    private int strFrstWordFntMetricsInf;
 
-    public StringOnScreen(LinkedList<String> elements, int heightOfStr, int strFrstWordFntMetricsInf) {
-        this.elements = elements;
+    public StringOnScreen(LinkedList<StrElement> strElements, int heightOfStr) {
+        this.strElements = strElements;
         this.heightOfStr = heightOfStr;
-        this.strFrstWordFntMetricsInf = strFrstWordFntMetricsInf;
     }
 
-    public LinkedList<String> getElements() {
-        return elements;
-    }
-
-    public int getStrFrstWordFntMetricsInf() {
-        return strFrstWordFntMetricsInf;
+    public LinkedList<StrElement> getStrElements() {
+        return strElements;
     }
 
     public int getHeightOfStr() {
