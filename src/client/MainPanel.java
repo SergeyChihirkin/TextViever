@@ -8,8 +8,9 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.LinkedList;
 
@@ -38,6 +39,9 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     private TextOnScreen textOnScreen;
     private TextStorage textStorage;
     private TextOnScreenManager textOnScreenManager;
+    private boolean isFileLong;
+    private File bufFile;
+    private LinkedList<Long> chunkPositions;
 
 
     public MainPanel(JFrame frame, TextReader reader) {
@@ -51,11 +55,6 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
         textPane.addKeyListener(this);
         frame.addComponentListener(this);
         addFileFilter();
-    }
-
-    private void addFileFilter() {
-        final FileNameExtensionFilter filter = new FileNameExtensionFilter("TEXT FILES", "txt", "text");
-        fc.setFileFilter(filter);
     }
 
     public MainPanel(String fileName, JFrame frame, TextReader textReaderNio) {
@@ -76,6 +75,11 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
         } catch (IOException ignore) {}
 
         getTextByFile(f);
+    }
+
+    private void addFileFilter() {
+        final FileNameExtensionFilter filter = new FileNameExtensionFilter("TEXT FILES", "txt", "text");
+        fc.setFileFilter(filter);
     }
 
     private void initAttributeSets() {
@@ -122,12 +126,27 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     }
 
     private void getTextByFile(File selectedFile) {
+        deleteBufFileIfExists();
         file = selectedFile;
 
         try {
-            textStorage = reader.getText(file);
+            isFileLong = reader.isFileLong(file);
+            if (!isFileLong) {
+                reader.clearPosParams();
+                textStorage = reader.getText(file);
+            }
         } catch (IOException e) {
             JOptionPane.showMessageDialog(frame, "Can't read from that file", "Error", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+    }
+
+    public void deleteBufFileIfExists() {
+        try {
+            if (bufFile != null && bufFile.exists()) {
+                Files.delete(bufFile.toPath());
+            }
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -256,13 +275,88 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
         }
     }
 
+    private void addTextToFile(ObjectOutputStream oos) {
+        try {
+            oos.writeObject(textOnScreen.getStrings());
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(frame, "Can't write to that file", "Error", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+    }
+
+    private void readAndStoreLongFile() {
+        try {
+            bufFile = new File(file.toString().concat("~"));
+            deleteBufFileIfExists();
+            bufFile.createNewFile();
+
+            try (FileOutputStream fos = new FileOutputStream(bufFile, true)) {
+                textOnScreenManager = new TextOnScreenManager(createWindowInformation());
+                reader.clearPosParams();
+                chunkPositions = new LinkedList<>();
+                try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                     ObjectOutputStream oos = new ObjectOutputStream(baos)) {
+                    while (!reader.isFileEnded()) {
+                        textStorage = reader.getText(file);
+                        textOnScreen = textOnScreenManager.createTextOnScreen(textStorage);
+
+                        addTextToFile(oos);
+
+                        baos.writeTo(fos);
+
+                        long chunkPosition = chunkPositions.size() == 0 ? baos.size() :
+                                baos.size() + chunkPositions.getLast();
+                        chunkPositions.add(chunkPosition);
+
+                        baos.reset();
+                        oos.reset();
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     private void redraw() {
         SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
-                textOnScreenManager = new TextOnScreenManager(createWindowInformation());
-                textOnScreen = textOnScreenManager.createTextOnScreen(textStorage);
-                printText();
+                if (!isFileLong) {
+                    textOnScreenManager = new TextOnScreenManager(createWindowInformation());
+                    textOnScreen = textOnScreenManager.createTextOnScreenAndFindStrNumbers(textStorage);
+                    printText();
+                } else {
+                    if (!reader.isFileEnded())
+                        readAndStoreLongFile();
+
+//                    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(bufFile))) {
+//                        LinkedList<StringOnScreen> strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
+//                        strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
+//                        strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
+//                    } catch (IOException | ClassNotFoundException e) {
+//                        e.printStackTrace();
+//                    }
+
+                    try (FileInputStream fis = new FileInputStream(file)) {
+                        final FileChannel channel = fis.getChannel();
+                        final ByteBuffer byteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0,
+                                chunkPositions.get(0) + 10000);
+                        byte[] bytes = new byte[byteBuffer.capacity()];
+                        byteBuffer.get(bytes, 0, bytes.length);
+                        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+                            LinkedList<StringOnScreen> strsOnScreen = null;
+                            try {
+                                strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
+                                strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
+                            } catch (ClassNotFoundException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         });
     }

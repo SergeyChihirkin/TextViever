@@ -48,6 +48,12 @@ public class TextOnScreenManager {
             textOnScreen.getStrings().addAll(stringsOnScreen);
         }
 
+        return textOnScreen;
+    }
+
+    TextOnScreen createTextOnScreenAndFindStrNumbers(TextStorage textStorage) {
+        final TextOnScreen textOnScreen = createTextOnScreen(textStorage);
+
         addFrstAndLastStrNumbrs(0, textOnScreen);
 
         return textOnScreen;

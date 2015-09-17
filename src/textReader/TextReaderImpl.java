@@ -2,29 +2,46 @@ package textReader;
 
 import data.TextStorage;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
+import java.util.Arrays;
+import java.util.LinkedList;
 
 public class TextReaderImpl implements TextReader {
     public static final Charset CHARSET = Charset.forName("UTF-8");
-    private final int BUFFER_SIZE = 1048576; //10mb
+//    private final int BUFFER_SIZE = 1048576; //10mb
+    private final int BUFFER_SIZE = 3288;
 
     private RandomAccessFile raf;
     private FileChannel channel;
 
     private CharBuffer chunkChrBuf;
     private long fileLength;
+    private int bufferSize;
+    private long strEnding;
+    private long filePos = 0;
+    private boolean fileEnded = false;
 
+    @Override
+    public void clearPosParams() {
+        filePos = 0;
+        fileEnded = false;
+    }
+
+    @Override
+    public boolean isFileLong(File file) throws IOException {
+        try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+            long fileLength = raf.length();
+
+            return fileLength > BUFFER_SIZE;
+        }
+    }
 
     @Override
     public TextStorage getText(File file) throws IOException {
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         setFile(file);
         final TextStorage textStorage = new TextStorage();
         try {
@@ -33,30 +50,14 @@ public class TextReaderImpl implements TextReader {
 
             prepareChunk();
 
-            int bufPos = 0;
-            char lastSeparator = '\0';
-            boolean isWaitingForSepSymb = false;
-            while (bufPos < chunkChrBuf.length()) {
-                final char c = chunkChrBuf.get(bufPos);
+            String textChunk = chunkChrBuf.toString();
 
-                if (isSepSymbol(c)) {
-                    if (isWaitingForSepSymb && c!= lastSeparator) {
-                        isWaitingForSepSymb = false;
-                    } else {
-                        final String str = new String(baos.toByteArray(), CHARSET);
-                        textStorage.addString(str);
-                        baos.reset();
-                        isWaitingForSepSymb = true;
-                        lastSeparator = c;
-                    }
-                } else
-                    baos.write(c);
+            String[] strs = textChunk.split("\\r\\n?|\\n");
 
-                bufPos++;
-            }
-
-            final String str = new String(baos.toByteArray(), CHARSET);
-            textStorage.addString(str);
+            final LinkedList<String> strings = new LinkedList<>(Arrays.asList(strs));
+            if (!fileEnded && strEnding != BUFFER_SIZE - 1)
+                strings.removeLast();
+            textStorage.setStrings(strings);
         } finally {
             close();
         }
@@ -64,17 +65,25 @@ public class TextReaderImpl implements TextReader {
         return textStorage;
     }
 
-    private boolean isSepSymbol(char c) {
-        return c == '\n' || c == '\r';
-    }
-
     private void prepareChunk() {
-        final long bufferSize = Math.min(BUFFER_SIZE, fileLength);
+        if (fileLength - filePos <= BUFFER_SIZE) {
+            bufferSize = (int)(fileLength - filePos);
+            fileEnded = true;
+        } else
+            bufferSize = BUFFER_SIZE;
 
         try {
-            final ByteBuffer byteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0, bufferSize);
-            chunkChrBuf = CHARSET.decode(byteBuffer);
+            final ByteBuffer byteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, filePos, bufferSize);
 
+            int i;
+            for (i = bufferSize - 1; i >= 0; i--) {
+                if (byteBuffer.get(i) == '\r' || byteBuffer.get(i) == '\n') {
+                    strEnding = i;
+                    break;
+                }
+            }
+            filePos += strEnding + 1;
+            chunkChrBuf = CHARSET.decode(byteBuffer);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -91,5 +100,9 @@ public class TextReaderImpl implements TextReader {
             raf.close();
             raf = null;
         }
+    }
+
+    public boolean isFileEnded() {
+        return fileEnded;
     }
 }

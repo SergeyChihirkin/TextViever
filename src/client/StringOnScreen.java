@@ -1,8 +1,9 @@
 package client;
 
+import java.io.Serializable;
 import java.util.LinkedList;
 
-public class StringOnScreen {
+public class StringOnScreen implements Serializable {
     private LinkedList<StrElement> strElements;
     private int heightOfStr;
 

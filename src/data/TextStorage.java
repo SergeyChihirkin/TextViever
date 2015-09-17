@@ -12,4 +12,8 @@ public class TextStorage {
     public LinkedList<String> getStrings() {
         return strings;
     }
+
+    public void setStrings(LinkedList<String> strings) {
+        this.strings = strings;
+    }
 }

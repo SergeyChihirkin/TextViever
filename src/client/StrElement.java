@@ -1,6 +1,8 @@
 package client;
 
-public class StrElement {
+import java.io.Serializable;
+
+public class StrElement implements Serializable {
     private ElementType elementType;
     private String str;
     private int numOfFnt;
@@ -24,6 +26,6 @@ public class StrElement {
     }
 }
 
-enum ElementType {
+enum ElementType implements Serializable {
     GROUP, SPACE
 }
