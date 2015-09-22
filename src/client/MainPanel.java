@@ -1,6 +1,7 @@
 package client;
 
 import data.TextStorage;
+import sun.misc.Cleaner;
 import textReader.TextReader;
 
 import javax.swing.*;
@@ -9,7 +10,7 @@ import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.*;
-import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.util.LinkedList;
@@ -42,6 +43,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     private boolean isFileLong;
     private File bufFile;
     private LinkedList<Long> chunkPositions;
+    private TextPositionManager textPositionManager;
 
 
     public MainPanel(JFrame frame, TextReader reader) {
@@ -157,28 +159,39 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
             public void run() {
                 textPane.setText("");
 
-                if (textOnScreen.getStrings().size() == 0)
+                if (textOnScreen.getFrstChunkStrings().size() == 0)
                     return;
 
                 final StyledDocument doc = textPane.getStyledDocument();
                 ((DefaultCaret)textPane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
 
                 try {
-                    for (int i = textOnScreen.getFrstStrNumber(); i <= textOnScreen.getLastStrNumber(); i++) {
-                        final StringOnScreen stringOnScreen = textOnScreen.getStrings().get(i);
-                        final LinkedList<StrElement> strElements = stringOnScreen.getStrElements();
-                        for (StrElement strElement : strElements) {
-                            doc.insertString(doc.getLength(), strElement.getStr(), getStyle(strElement.getNumOfFnt()));
-                        }
-                        doc.insertString(doc.getLength(), "\n", findStyle(stringOnScreen.getHeightOfStr()));
-                    }
+                    final LinkedList<StringOnScreen> frstChunkStrings = textOnScreen.getFrstChunkStrings();
+                    final int lastStrInFrstChunk = Math.min(frstChunkStrings.size() - 1,
+                            textOnScreen.getLastStrNumber());
+                    for (int i = textOnScreen.getFrstStrNumber(); i <= lastStrInFrstChunk; i++)
+                        printString(doc, i, frstChunkStrings);
+                    final LinkedList<StringOnScreen> scndChunkStrings = textOnScreen.getScndChunkStrings();
+                    int scndChunkStart = textOnScreen.getFrstStrNumber() - frstChunkStrings.size();
+                    scndChunkStart = scndChunkStart < 0 ? 0 : scndChunkStart;
+                    for (int i = scndChunkStart; i < textOnScreen.getLastStrNumber() - frstChunkStrings.size() + 1; i++)
+                        printString(doc, i, scndChunkStrings);
                 } catch (BadLocationException e) {
                     JOptionPane.showMessageDialog(frame, "Can't print text", "Error", JOptionPane.ERROR_MESSAGE);
                     e.printStackTrace();
                 }
-
             }
         });
+    }
+
+    private void printString(StyledDocument doc, int i, LinkedList<StringOnScreen> strings)
+            throws BadLocationException {
+        final StringOnScreen stringOnScreen = strings.get(i);
+        final LinkedList<StrElement> strElements = stringOnScreen.getStrElements();
+        for (StrElement strElement : strElements) {
+            doc.insertString(doc.getLength(), strElement.getStr(), getStyle(strElement.getNumOfFnt()));
+        }
+        doc.insertString(doc.getLength(), "\n", findStyle(stringOnScreen.getHeightOfStr()));
     }
 
     private AttributeSet findStyle(int heightOfStr) {
@@ -243,8 +256,8 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
     }
 
     private WindowInformation createWindowInformation() {
-        return new WindowInformation(txtScrollPane.getHeight(), txtScrollPane.getWidth(), TAB_WIDTH,
-                getFntMetrics(frstAttr), getFntMetrics(scndAttr));
+        return new WindowInformation(txtScrollPane.getWidth(), TAB_WIDTH, getFntMetrics(frstAttr),
+                getFntMetrics(scndAttr));
     }
 
     @Override
@@ -253,16 +266,16 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
             return;
 
         if (e.getKeyCode() == KeyEvent.VK_DOWN) {
-            textOnScreenManager.nextString(textOnScreen);
+            textPositionManager.nextString(textOnScreen);
             printText();
         } else if (e.getKeyCode() == KeyEvent.VK_UP) {
-            textOnScreenManager.previousString(textOnScreen);
+            textPositionManager.previousString(textOnScreen);
             printText();
         } else if (e.getKeyCode() == KeyEvent.VK_PAGE_DOWN) {
-            textOnScreenManager.nextPage(textOnScreen);
+            textPositionManager.nextPage(textOnScreen);
             printText();
         } else if (e.getKeyCode() == KeyEvent.VK_PAGE_UP) {
-            textOnScreenManager.previousPage(textOnScreen);
+            textPositionManager.previousPage(textOnScreen);
             printText();
         }
     }
@@ -277,7 +290,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
 
     private void addTextToFile(ObjectOutputStream oos) {
         try {
-            oos.writeObject(textOnScreen.getStrings());
+            oos.writeObject(textOnScreen.getFrstChunkStrings());
         } catch (IOException e) {
             JOptionPane.showMessageDialog(frame, "Can't write to that file", "Error", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
@@ -290,26 +303,35 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
             deleteBufFileIfExists();
             bufFile.createNewFile();
 
-            try (FileOutputStream fos = new FileOutputStream(bufFile, true)) {
+            try (RandomAccessFile raf = new RandomAccessFile(bufFile, "rw"); FileChannel channel = raf.getChannel()) {
                 textOnScreenManager = new TextOnScreenManager(createWindowInformation());
                 reader.clearPosParams();
                 chunkPositions = new LinkedList<>();
-                try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                     ObjectOutputStream oos = new ObjectOutputStream(baos)) {
-                    while (!reader.isFileEnded()) {
+
+                while (!reader.isFileEnded()) {
+                    try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                         ObjectOutputStream oos = new ObjectOutputStream(baos)) {
                         textStorage = reader.getText(file);
                         textOnScreen = textOnScreenManager.createTextOnScreen(textStorage);
 
                         addTextToFile(oos);
 
-                        baos.writeTo(fos);
+                        final long chunkStart = chunkPositions.size() == 0 ? 0 : chunkPositions.getLast();
+                        final long chunkEnd = baos.toByteArray().length + chunkStart;
+                        chunkPositions.add(chunkEnd);
 
-                        long chunkPosition = chunkPositions.size() == 0 ? baos.size() :
-                                baos.size() + chunkPositions.getLast();
-                        chunkPositions.add(chunkPosition);
+                        final MappedByteBuffer mappedByteBuffer = channel.map(FileChannel.MapMode.READ_WRITE,
+                                chunkStart, chunkEnd);
 
-                        baos.reset();
-                        oos.reset();
+                        try {
+                            mappedByteBuffer.put(baos.toByteArray());
+                            mappedByteBuffer.force();
+                        } finally {
+                            Cleaner cleaner = ((sun.nio.ch.DirectBuffer) mappedByteBuffer).cleaner();
+                            if (cleaner != null) {
+                                cleaner.clean();
+                            }
+                        }
                     }
                 }
             }
@@ -324,39 +346,17 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
             public void run() {
                 if (!isFileLong) {
                     textOnScreenManager = new TextOnScreenManager(createWindowInformation());
-                    textOnScreen = textOnScreenManager.createTextOnScreenAndFindStrNumbers(textStorage);
-                    printText();
+                    textOnScreen = textOnScreenManager.createTextOnScreen(textStorage);
+                    textPositionManager = new TextPositionManager(txtScrollPane.getHeight());
                 } else {
                     if (!reader.isFileEnded())
                         readAndStoreLongFile();
 
-//                    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(bufFile))) {
-//                        LinkedList<StringOnScreen> strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
-//                        strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
-//                        strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
-//                    } catch (IOException | ClassNotFoundException e) {
-//                        e.printStackTrace();
-//                    }
-
-                    try (FileInputStream fis = new FileInputStream(file)) {
-                        final FileChannel channel = fis.getChannel();
-                        final ByteBuffer byteBuffer = channel.map(FileChannel.MapMode.READ_ONLY, 0,
-                                chunkPositions.get(0) + 10000);
-                        byte[] bytes = new byte[byteBuffer.capacity()];
-                        byteBuffer.get(bytes, 0, bytes.length);
-                        try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
-                            LinkedList<StringOnScreen> strsOnScreen = null;
-                            try {
-                                strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
-                                strsOnScreen = (LinkedList<StringOnScreen>)ois.readObject();
-                            } catch (ClassNotFoundException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                    textPositionManager = new TextPositionManager(txtScrollPane.getHeight(), bufFile, chunkPositions);
+                    textOnScreen = textPositionManager.getTextOnScreenFromFile();
                 }
+                textPositionManager.addFrstAndLastStrNumbrs(0, textOnScreen);
+                printText();
             }
         });
     }

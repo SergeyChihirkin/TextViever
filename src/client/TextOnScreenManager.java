@@ -13,7 +13,7 @@ public class TextOnScreenManager {
     private final int MAX_WORD_IN_GROUP_NUM = 2;
     private final int MAX_FNT_METRICS_NUM = 2;
 
-    private int windowHeight, windowWidth, tabWidth;
+    private int windowWidth, tabWidth;
     private FontMetrics frstFntMetrics, scndFntMetrics;
 
     private int curStrWdth;
@@ -33,7 +33,6 @@ public class TextOnScreenManager {
     public TextOnScreenManager(WindowInformation windowInformation) {
         frstFntMetrics = windowInformation.getFrstFntMetrics();
         scndFntMetrics = windowInformation.getScndFntMetrics();
-        windowHeight = windowInformation.getHeight();
         windowWidth = windowInformation.getWidth();
         tabWidth = windowInformation.getTabWidth();
     }
@@ -45,31 +44,10 @@ public class TextOnScreenManager {
 
         for (String stringOfText : textStorage.getStrings()) {
             LinkedList<StringOnScreen> stringsOnScreen = getStringsOnScreen(stringOfText);
-            textOnScreen.getStrings().addAll(stringsOnScreen);
+            textOnScreen.getFrstChunkStrings().addAll(stringsOnScreen);
         }
 
         return textOnScreen;
-    }
-
-    TextOnScreen createTextOnScreenAndFindStrNumbers(TextStorage textStorage) {
-        final TextOnScreen textOnScreen = createTextOnScreen(textStorage);
-
-        addFrstAndLastStrNumbrs(0, textOnScreen);
-
-        return textOnScreen;
-    }
-
-    private void addFrstAndLastStrNumbrs(int frstStrNum, TextOnScreen textOnScreen) {
-        textOnScreen.setFrstStrNumber(frstStrNum);
-        int height = 0;
-        int i = frstStrNum;
-        while (height < windowHeight && i < textOnScreen.getStrings().size()) {
-            height += textOnScreen.getStrings().get(i).getHeightOfStr();
-            i++;
-        }
-
-        final int lastStrNumber = i == frstStrNum ? i : i - 1;
-        textOnScreen.setLastStrNumber(lastStrNumber);
     }
 
     private void init() {
@@ -315,38 +293,6 @@ public class TextOnScreenManager {
 
     private boolean isNotFitWindow(int charWidth) {
         return windowWidth <= curStrWdth + elWdth + wordWdth + charWidth;
-    }
-
-    public void nextString(TextOnScreen textOnScreen) {
-        int frstStrNumber = textOnScreen.getFrstStrNumber();
-        if (frstStrNumber != textOnScreen.getLastStrNumber()) {
-            frstStrNumber++;
-            addFrstAndLastStrNumbrs(frstStrNumber, textOnScreen);
-        }
-    }
-
-    public void previousString(TextOnScreen textOnScreen) {
-        int frstStrNumber = textOnScreen.getFrstStrNumber();
-        if (frstStrNumber != 0) {
-            frstStrNumber--;
-            addFrstAndLastStrNumbrs(frstStrNumber, textOnScreen);
-        }
-    }
-
-    public void nextPage(TextOnScreen textOnScreen) {
-        addFrstAndLastStrNumbrs(textOnScreen.getLastStrNumber(), textOnScreen);
-    }
-
-    public void previousPage(TextOnScreen textOnScreen) {
-        int oldFrstStrNum = textOnScreen.getFrstStrNumber();
-
-        if (oldFrstStrNum == textOnScreen.getLastStrNumber()) {
-            previousString(textOnScreen);
-            oldFrstStrNum = textOnScreen.getFrstStrNumber();
-        }
-
-        while (oldFrstStrNum < textOnScreen.getLastStrNumber() && textOnScreen.getFrstStrNumber() != 0)
-            previousString(textOnScreen);
     }
 
     static enum State {
