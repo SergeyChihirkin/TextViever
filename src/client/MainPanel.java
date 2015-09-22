@@ -349,8 +349,7 @@ public class MainPanel extends ComponentAdapter implements ActionListener, KeyLi
                     textOnScreen = textOnScreenManager.createTextOnScreen(textStorage);
                     textPositionManager = new TextPositionManager(txtScrollPane.getHeight());
                 } else {
-                    if (!reader.isFileEnded())
-                        readAndStoreLongFile();
+                    readAndStoreLongFile();
 
                     textPositionManager = new TextPositionManager(txtScrollPane.getHeight(), bufFile, chunkPositions);
                     textOnScreen = textPositionManager.getTextOnScreenFromFile();

@@ -12,8 +12,8 @@ import java.util.LinkedList;
 
 public class TextReaderImpl implements TextReader {
     public static final Charset CHARSET = Charset.forName("UTF-8");
-//    private final int BUFFER_SIZE = 1048576; //10mb
-    private final int BUFFER_SIZE = 4096;
+    private final int BUFFER_SIZE = 1048576; //10mb
+//    private final int BUFFER_SIZE = 4096;
 
     private RandomAccessFile raf;
     private FileChannel channel;
